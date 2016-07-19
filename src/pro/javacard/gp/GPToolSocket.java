@@ -27,6 +27,7 @@ public class GPToolSocket {
     public final static int DEFAULT_PORT = 9988;
     public final static int DEFAULT_WORKERS = 1;
     public final static int DEFAULT_BACKLOG = 1024;
+    public final static boolean DEFAULT_ALLOW_TERMINATE = false;
 
     public final static String OPT_IP = "ip";
     public final static String OPT_PORT = "port";
@@ -35,6 +36,8 @@ public class GPToolSocket {
     private final static String OPT_DEBUG = "debug";
     private final static String OPT_VERBOSE = "verbose";
     private final static String OPT_VERSION = "version";
+    private final static String OPT_ALLOW_TERMINATE = "allow-terminate";
+    private final static String TERMINATE_MAGIC_STRING = "TERMINATE_PLEASE";
 
     /**
      * Server is running flag.
@@ -51,11 +54,6 @@ public class GPToolSocket {
      */
     protected ThreadPoolExecutor executor;
 
-    /**
-     * Concurrent queue of jobs. Will be processed by workers.
-     */
-    protected final ConcurrentLinkedQueue<Connection> jobs = new ConcurrentLinkedQueue<>();
-
     public static OptionSet parseArguments(String[] argv) throws IOException {
         OptionSet args = null;
 
@@ -66,10 +64,25 @@ public class GPToolSocket {
         parser.acceptsAll(Arrays.asList("d", OPT_DEBUG), "Show PC/SC and APDU trace");
         parser.acceptsAll(Arrays.asList("v", OPT_VERBOSE), "Be verbose about operations");
 
-        // Add socket options
-        parser.accepts(OPT_IP, "IP address to bind to").withOptionalArg().defaultsTo(DEFAULT_IP);
-        parser.accepts(OPT_PORT, "TCP port to bind to").withOptionalArg().ofType(Integer.class).defaultsTo(DEFAULT_PORT);
-        parser.accepts(OPT_WORKERS, "Number of worker threads to use").withOptionalArg().ofType(Integer.class).defaultsTo(DEFAULT_WORKERS);
+        // Server options
+        parser.accepts(OPT_IP, "IP address to bind to")
+                .withOptionalArg()
+                .defaultsTo(DEFAULT_IP);
+
+        parser.accepts(OPT_PORT, "TCP port to bind to")
+                .withOptionalArg()
+                .ofType(Integer.class)
+                .defaultsTo(DEFAULT_PORT);
+
+        parser.accepts(OPT_WORKERS, "Number of worker threads to use")
+                .withOptionalArg()
+                .ofType(Integer.class)
+                .defaultsTo(DEFAULT_WORKERS);
+
+        parser.accepts(OPT_ALLOW_TERMINATE, "Allows to terminate the server by the client")
+                .withOptionalArg()
+                .ofType(Boolean.class)
+                .defaultsTo(DEFAULT_ALLOW_TERMINATE);
 
         // Parse arguments
         try {
@@ -152,6 +165,8 @@ public class GPToolSocket {
                     // Timeout is OK.
                 }
             }
+
+            System.out.println("Server shutting down");
         }
         catch(IOException e) {
             System.out.println("Listen :" + e.getMessage());
@@ -178,6 +193,10 @@ public class GPToolSocket {
 
     public ThreadPoolExecutor getExecutor() {
         return executor;
+    }
+
+    public void shutdownServer(){
+        this.running = false;
     }
 
     protected static String convertStreamToString(InputStream is) {
@@ -218,11 +237,19 @@ public class GPToolSocket {
 
             try {
                 inputData = convertStreamToString(input);
+                final Boolean allowTerminate = (Boolean) args.valueOf(OPT_ALLOW_TERMINATE);
 
                 // Enqueue current job to the queue.
                 future = parent.getExecutor().submit(new Runnable() {
                     @Override
                     public void run() {
+                        // Terminate handler
+                        if (allowTerminate != null && inputData.startsWith(TERMINATE_MAGIC_STRING)){
+                            printOut.println("Server is shutting down");
+                            parent.shutdownServer();
+                            return;
+                        }
+
                         final GPTool tool = new GPTool(printOut, printOut);
                         try {
                             if (args.has(OPT_DEBUG)){
