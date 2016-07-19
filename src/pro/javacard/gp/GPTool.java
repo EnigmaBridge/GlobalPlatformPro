@@ -225,13 +225,13 @@ public final class GPTool {
 			}
 			err.println();
 			parser.printHelpOn(err);
-			System.exit(1);
+			return null;
 		}
 
 		// Do the work, based on arguments
 		if (args.has("help")) {
 			parser.printHelpOn(out);
-			System.exit(0);
+			return null;
 		}
 
 		return args;
@@ -243,6 +243,10 @@ public final class GPTool {
 	}
 
 	public int work(OptionSet args) throws IOException, NoSuchAlgorithmException {
+		if (args == null){
+			return -2;
+		}
+
 		if (args.has(OPT_VERBOSE)) {
 			// Set up slf4j simple in a way that pleases us
 			System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", "debug");
