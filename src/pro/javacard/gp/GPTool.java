@@ -20,11 +20,8 @@
  */
 package pro.javacard.gp;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.OutputStream;
+import java.io.*;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumSet;
@@ -115,7 +112,18 @@ public final class GPTool {
 	private final static String OPT_VIRGIN = "virgin";
 	private final static String OPT_VISA2 = "visa2";
 
-	private static OptionParser setupParser(){
+	protected PrintStream out = System.out;
+	protected PrintStream err = System.err;
+
+	public GPTool() {
+	}
+
+	public GPTool(PrintStream out, PrintStream err) {
+		this.out = out;
+		this.err = err;
+	}
+
+	protected static OptionParser setupParser(){
 		final OptionParser parser = new OptionParser();
 
 		// Generic options
@@ -196,7 +204,11 @@ public final class GPTool {
 		return parser;
 	}
 
-	private static OptionSet parseArguments(String[] argv) throws IOException {
+	protected static OptionSet parseArguments(String[] argv) throws IOException {
+		return parseArguments(argv, System.out, System.err);
+	}
+
+	protected static OptionSet parseArguments(String[] argv, PrintStream out, PrintStream err) throws IOException {
 		OptionSet args = null;
 		final OptionParser parser = setupParser();
 
@@ -207,27 +219,26 @@ public final class GPTool {
 			// for (String s: parser.recognizedOptions().keySet()) {args.valuesOf(s);} // FIXME: screws up logging hack
 		} catch (OptionException e) {
 			if (e.getCause() != null) {
-				System.err.println(e.getMessage() + ": " + e.getCause().getMessage());
+				err.println(e.getMessage() + ": " + e.getCause().getMessage());
 			} else {
-				System.err.println(e.getMessage());
+				err.println(e.getMessage());
 			}
-			System.err.println();
-			parser.printHelpOn(System.err);
+			err.println();
+			parser.printHelpOn(err);
 			System.exit(1);
 		}
 
 		// Do the work, based on arguments
 		if (args.has("help")) {
-			parser.printHelpOn(System.out);
+			parser.printHelpOn(out);
 			System.exit(0);
 		}
 
 		return args;
 	}
 
-	public static void main(String[] argv) throws Exception {
-
-		OptionSet args = parseArguments(argv);
+	protected int work(String[] argv) throws IOException, NoSuchAlgorithmException {
+		final OptionSet args = parseArguments(argv, out, err);
 
 		if (args.has(OPT_VERBOSE)) {
 			// Set up slf4j simple in a way that pleases us
@@ -247,7 +258,7 @@ public final class GPTool {
 			version += " " + System.getProperty("os.arch");
 			version += ", Java " + System.getProperty("java.version");
 			version += " by " + System.getProperty("java.vendor");
-			System.out.println("GlobalPlatformPro " + version);
+			out.println("GlobalPlatformPro " + version);
 		}
 
 		// Normally assume a single master key
@@ -273,16 +284,17 @@ public final class GPTool {
 					expected = GPCrypto.scp03_key_check_value(k);
 				} else {
 					fail("Don't know how to compute KCV for " + k.getType());
-					return; // static analyzer sugar
+					return -1;
 				}
 				// Check KCV
 				if (!Arrays.equals(given, expected)) {
 					fail("KCV does not match, expected " + HexUtils.bin2hex(expected) + " but given " + HexUtils.bin2hex(given));
+					return 1;
 				}
 			}
 			keys = PlaintextKeys.fromMasterKey(k, div);
 		} else if (args.has(OPT_KEY_MAC) || args.has(OPT_KEY_ENC) || args.has(OPT_KEY_KEK)) {
-			System.out.println("ATTENTION: Overriding default keys ...");
+			out.println("ATTENTION: Overriding default keys ...");
 			// Override some keys
 			GPKeySet ks = new GPKeySet(GPData.defaultKey);
 			if (args.has(OPT_KEY_MAC)) {
@@ -317,14 +329,14 @@ public final class GPTool {
 			File capfile = (File) args.valueOf(OPT_CAP);
 			cap = new CapFile(new FileInputStream(capfile));
 			if (args.has(OPT_VERBOSE) || args.has(OPT_INFO)) { // TODO: remove -v
-				System.out.println("**** CAP info of " + capfile.getName());
-				cap.dump(System.out);
+				out.println("**** CAP info of " + capfile.getName());
+				cap.dump(out);
 			}
 		}
 
 		if (args.has(OPT_LIST_PRIVS)) {
-			System.out.println("# Known privileges:");
-			System.out.println(Joiner.on("\n").join(Privilege.values()));
+			out.println("# Known privileges:");
+			out.println(Joiner.on("\n").join(Privilege.values()));
 		}
 
 		// Now actually talk to possible terminals
@@ -344,9 +356,9 @@ public final class GPTool {
 
 			// List terminals if needed
 			if (args.has(OPT_DEBUG)) {
-				System.out.println("# Detected readers from " + tf.getProvider().getName());
+				out.println("# Detected readers from " + tf.getProvider().getName());
 				for (CardTerminal term : terminals.list()) {
-					System.out.println((term.isCardPresent() ? "[*] " : "[ ] ") + term.getName());
+					out.println((term.isCardPresent() ? "[*] " : "[ ] ") + term.getName());
 				}
 			}
 
@@ -359,6 +371,7 @@ public final class GPTool {
 				CardTerminal t = terminals.getTerminal(reader);
 				if (t == null) {
 					fail("Reader \"" + reader + "\" not found.");
+					return 1;
 				}
 				do_readers = Arrays.asList(t);
 			} else {
@@ -367,11 +380,12 @@ public final class GPTool {
 
 			if (do_readers.size() == 0) {
 				fail("No smart card readers with a card found");
+				return 1;
 			}
 			// Work all readers
 			for (CardTerminal reader: do_readers) {
 				if (do_readers.size() > 1) {
-					System.out.println("# " + reader.getName());
+					out.println("# " + reader.getName());
 				}
 				// Wrap with logging if requested
 				if (args.has(OPT_DEBUG)) {
@@ -393,7 +407,7 @@ public final class GPTool {
 						// which uses real SCardBeginTransaction
 						card.beginExclusive();
 					} catch (CardException e) {
-						System.err.println("Could not connect to " + reader.getName() + ": " + TerminalManager.getExceptionMessage(e));
+						err.println("Could not connect to " + reader.getName() + ": " + TerminalManager.getExceptionMessage(e));
 						continue;
 					}
 
@@ -413,11 +427,11 @@ public final class GPTool {
 						gp.setBlockSize((int)args.valueOf(OPT_BS));
 					}
 					if (args.has(OPT_INFO) || args.has(OPT_VERBOSE)) {
-						System.out.println("Reader: " + reader.getName());
-						System.out.println("ATR: " + HexUtils.bin2hex(card.getATR().getBytes()));
-						System.out.println("More information about your card:");
-						System.out.println("    http://smartcard-atr.appspot.com/parse?ATR="+HexUtils.bin2hex(card.getATR().getBytes()));
-						System.out.println();
+						out.println("Reader: " + reader.getName());
+						out.println("ATR: " + HexUtils.bin2hex(card.getATR().getBytes()));
+						out.println("More information about your card:");
+						out.println("    http://smartcard-atr.appspot.com/parse?ATR="+HexUtils.bin2hex(card.getATR().getBytes()));
+						out.println();
 					}
 
 					// Send all raw APDU-s to the default-selected application of the card
@@ -433,7 +447,7 @@ public final class GPTool {
 
 					// Fetch some possibly interesting data
 					if (args.has(OPT_INFO)) {
-						System.out.println("***** Card info:");
+						out.println("***** Card info:");
 						GPData.print_card_info(gp);
 					}
 
@@ -472,7 +486,7 @@ public final class GPTool {
 								if (reg.getDefaultSelectedPackageAID() != null) {
 									gp.deleteAID(reg.getDefaultSelectedPackageAID(), true);
 								} else {
-									System.err.println("Could not identify default selected application!");
+									err.println("Could not identify default selected application!");
 								}
 							}
 							@SuppressWarnings("unchecked")
@@ -484,11 +498,11 @@ public final class GPTool {
 									gp.deleteAID(aid, reg.allPackageAIDs().contains(aid) || args.has(OPT_FORCE));
 								} catch (GPException e) {
 									if (!gp.getRegistry().allAIDs().contains(aid)) {
-										System.err.println("Could not delete AID (not present on card): " + aid);
+										err.println("Could not delete AID (not present on card): " + aid);
 									} else {
-										System.err.println("Could not delete AID: " + aid);
+										err.println("Could not delete AID: " + aid);
 										if (e.sw == 0x6985) {
-											System.err.println("Deletion not allowed. Some app still active?");
+											err.println("Deletion not allowed. Some app still active?");
 										} else {
 											throw e;
 										}
@@ -503,10 +517,10 @@ public final class GPTool {
 							CapFile instcap = new CapFile(new FileInputStream(capfile));
 							AID aid = instcap.getPackageAID();
 							if (!gp.getRegistry().allAIDs().contains(aid)) {
-								System.out.println(aid + " is not present on card!");
+								out.println(aid + " is not present on card!");
 							} else {
 								gp.deleteAID(aid, true);
-								System.out.println(aid + " deleted.");
+								out.println(aid + " deleted.");
 							}
 						}
 
@@ -516,13 +530,13 @@ public final class GPTool {
 							CapFile loadcap = new CapFile(new FileInputStream(capfile));
 
 							if (args.has(OPT_VERBOSE)) {
-								loadcap.dump(System.out);
+								loadcap.dump(out);
 							}
 							try {
 								gp.loadCapFile(loadcap);
 							} catch (GPException e) {
 								if (e.sw == 0x6985) {
-									System.err.println("Applet loading failed. Are you sure the CAP file target is compatible with your card?");
+									err.println("Applet loading failed. Are you sure the CAP file target is compatible with your card?");
 								} else {
 									throw e;
 								}
@@ -538,14 +552,16 @@ public final class GPTool {
 							CapFile instcap = new CapFile(new FileInputStream(capfile));
 
 							if (args.has(OPT_VERBOSE)) {
-								instcap.dump(System.out);
+								instcap.dump(out);
 							}
 							// Only install if cap contains a single applet
 							if (instcap.getAppletAIDs().size() == 0) {
 								fail("No applets in CAP, use --" + OPT_LOAD + " instead");
+								return 1;
 							}
 							if (instcap.getAppletAIDs().size() > 1) {
 								fail("CAP contains more than one applet, create instances manually with --" + OPT_LOAD + " and --" + OPT_CREATE);
+								return 1;
 							}
 
 							GPRegistry reg = gp.getRegistry();
@@ -562,10 +578,10 @@ public final class GPTool {
 
 							try {
 								gp.loadCapFile(instcap);
-								System.err.println("CAP loaded");
+								err.println("CAP loaded");
 							} catch (GPException e) {
 								if (e.sw == 0x6985 || e.sw == 0x6A80) {
-									System.err.println("Applet loading failed. Are you sure the CAP file (JC version, packages) is compatible with your card?");
+									err.println("Applet loading failed. Are you sure the CAP file (JC version, packages) is compatible with your card?");
 								}
 								throw e;
 							}
@@ -579,7 +595,7 @@ public final class GPTool {
 								appaid = (AID) args.valueOf(OPT_CREATE);
 							}
 							if (gp.getRegistry().allAIDs().contains(appaid)) {
-								System.err.println("WARNING: Applet " + appaid + " already present on card");
+								err.println("WARNING: Applet " + appaid + " already present on card");
 							}
 							gp.installAndMakeSelectable(instcap.getPackageAID(), appaid, null, privs, getInstParams(args), null);
 						}
@@ -623,7 +639,7 @@ public final class GPTool {
 								packageAID = (AID) args.valueOf(OPT_PACKAGE);
 								appletAID = (AID) args.valueOf(OPT_APPLET);
 							} else {
-								System.out.println("Note: using default AID-s for SSD: " + appletAID + " from " + packageAID);
+								out.println("Note: using default AID-s for SSD: " + appletAID + " from " + packageAID);
 							}
 							AID instanceAID = (AID) args.valueOf(OPT_DOMAIN);
 
@@ -640,7 +656,7 @@ public final class GPTool {
 							if (args.has(OPT_APPLET)) {
 								gp.storeData((AID)args.valueOf(OPT_APPLET), (byte[]) args.valueOf(OPT_STORE_DATA));
 							} else {
-								System.err.println("Must specify target application with -" + OPT_APPLET);
+								err.println("Must specify target application with -" + OPT_APPLET);
 							}
 						}
 						// --lock-card
@@ -674,42 +690,42 @@ public final class GPTool {
 						if (args.has(OPT_LIST)) {
 							String tab = "     ";
 							GPRegistry reg = gp.getRegistry();
-							System.out.println("# Mode: " + gp.spec); // TODO: expose ?
+							out.println("# Mode: " + gp.spec); // TODO: expose ?
 							for (GPRegistryEntry e : reg) {
 								AID aid = e.getAID();
-								System.out.print(e.getType().toShortString() + ": " + HexUtils.bin2hex(aid.getBytes()) + " (" + e.getLifeCycleString() + ")");
+								out.print(e.getType().toShortString() + ": " + HexUtils.bin2hex(aid.getBytes()) + " (" + e.getLifeCycleString() + ")");
 								if (e.getType() != Kind.IssuerSecurityDomain && args.has(OPT_VERBOSE)) {
-									System.out.println(" (" + GPUtils.byteArrayToReadableString(aid.getBytes()) + ")");
+									out.println(" (" + GPUtils.byteArrayToReadableString(aid.getBytes()) + ")");
 								} else {
-									System.out.println();
+									out.println();
 								}
 
 								if (e.getDomain() != null) {
-									System.out.println(tab + "Parent:  " + e.getDomain());
+									out.println(tab + "Parent:  " + e.getDomain());
 								}
 								if (e.getType() == Kind.ExecutableLoadFile) {
 									GPRegistryEntryPkg pkg = (GPRegistryEntryPkg) e;
 									if (pkg.getVersion() != null) {
-										System.out.println(tab + "Version: " + pkg.getVersionString());
+										out.println(tab + "Version: " + pkg.getVersionString());
 									}
 									for (AID a : pkg.getModules()) {
-										System.out.print(tab + "Applet:  " +  HexUtils.bin2hex(a.getBytes()));
+										out.print(tab + "Applet:  " +  HexUtils.bin2hex(a.getBytes()));
 										if (args.has(OPT_VERBOSE)) {
-											System.out.println(" (" + GPUtils.byteArrayToReadableString(a.getBytes()) + ")");
+											out.println(" (" + GPUtils.byteArrayToReadableString(a.getBytes()) + ")");
 										} else {
-											System.out.println();
+											out.println();
 										}
 									}
 								} else {
 									GPRegistryEntryApp app = (GPRegistryEntryApp) e;
 									if (app.getLoadFile() != null) {
-										System.out.println(tab + "From:    " + app.getLoadFile());
+										out.println(tab + "From:    " + app.getLoadFile());
 									}
 									if (!app.getPrivileges().isEmpty()) {
-										System.out.println(tab + "Privs:   " + app.getPrivileges());
+										out.println(tab + "Privs:   " + app.getPrivileges());
 									}
 								}
-								System.out.println();
+								out.println();
 							}
 						}
 
@@ -739,7 +755,7 @@ public final class GPTool {
 								// normally replace existing keys
 								gp.putKeys(newkeys, true);
 							}
-							System.out.println("Default " + new_key.toStringKey() + " set as master key.");
+							out.println("Default " + new_key.toStringKey() + " set as master key.");
 						}
 
 						// --lock
@@ -772,11 +788,11 @@ public final class GPTool {
 								// normally replace
 								gp.putKeys(updatekeys, true);
 							}
-							System.out.println("Card locked with: " + newkey.master.toStringKey());
+							out.println("Card locked with: " + newkey.master.toStringKey());
 							if (newkey.diversifier!= Diversification.NONE) {
-								System.out.println("Remember to use " + newkey.diversifier.name() + " diversification!");
+								out.println("Remember to use " + newkey.diversifier.name() + " diversification!");
 							}
-							System.out.println("Write this down, DO NOT FORGET/LOSE IT!");
+							out.println("Write this down, DO NOT FORGET/LOSE IT!");
 						}
 
 						// --make-default <aid>
@@ -786,11 +802,12 @@ public final class GPTool {
 					}
 				} catch (GPException e) {
 					if (args.has(OPT_VERBOSE)) {
-						e.printStackTrace(System.err);
+						e.printStackTrace(err);
 					}
 					// All unhandled GP exceptions halt the program unless it is run with -relax
 					if (!args.has(OPT_RELAX)) {
 						fail(e.getMessage());
+						return 1;
 					}
 				} catch (CardException e) {
 					// Card exceptions skip to the next reader, if available and allowed FIXME broken logic
@@ -806,14 +823,25 @@ public final class GPTool {
 		} catch (CardException e) {
 			// Sensible wrapper for the different PC/SC exceptions
 			if (TerminalManager.getExceptionMessage(e) != null) {
-				System.out.println("PC/SC failure: " + TerminalManager.getExceptionMessage(e));
+				out.println("PC/SC failure: " + TerminalManager.getExceptionMessage(e));
 			} else {
 				e.printStackTrace(); // TODO: remove
 				fail("CardException, terminating");
+				return 1;
 			}
 		}
 		// Other exceptions escape. fin.
-		System.exit(0);
+		return 0;
+	}
+
+	private void fail(String msg) {
+		err.println(msg);
+	}
+
+	public static void main(String[] argv) throws Exception {
+		final GPTool tool = new GPTool();
+		final int returnCode = tool.work(argv);
+		System.exit(returnCode);
 	}
 
 	// FIXME: get rid
@@ -880,10 +908,5 @@ public final class GPTool {
 		if (args.has(OPT_STORE_DATA) || args.has(OPT_INITIALIZED) || args.has(OPT_SECURED))
 			return true;
 		return false;
-	}
-
-	private static void fail(String msg) {
-		System.err.println(msg);
-		System.exit(1);
 	}
 }
