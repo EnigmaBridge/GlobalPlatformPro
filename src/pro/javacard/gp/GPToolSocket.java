@@ -225,6 +225,7 @@ public class GPToolSocket {
                     public void run() {
                         final GPTool tool = new GPTool(printOut, printOut);
                         try {
+                            // If tokenizer is not powerful enough, consider using this one: org.apache.tools.ant.types.Commandline
                             final List<String> inputArgs = GPArgumentTokenizer.tokenize(inputData);
                             tool.work(inputArgs.toArray(new String[inputArgs.size()]));
 
