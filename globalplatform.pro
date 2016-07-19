@@ -21,6 +21,9 @@
 -keep public class pro.javacard.gp.GPTool {
     public static void main(java.lang.String[]);
 }
+-keep public class pro.javacard.gp.GPToolSocket {
+    public static void main(java.lang.String[]);
+}
 # For enum-s (why this is not default?)
 -keepclassmembers,allowoptimization enum * {
     public static **[] values();
