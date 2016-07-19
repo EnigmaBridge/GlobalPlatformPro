@@ -12,13 +12,20 @@ import java.net.SocketTimeoutException;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.List;
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadPoolExecutor;
 
 /**
- * Socket version of GPTool
+ * Socket version of GPTool.
+ * Opens listening socket at the specified address & port (default 127.0.0.1:9988)
+ * listening for commands.
+ *
+ * Each connection corresponds to one GPTool execution. String passed to the port
+ * is passed to GPTool as input arguments. Response is written to the connection and closed.
+ *
+ * Tool works with 1 worker thread by default. All jobs are submitted to the worker manager (executor service).
+ * To increase parallelism, one can set number of worker threads with --workers.
  *
  * Created by dusanklinec on 19.07.16.
  */
