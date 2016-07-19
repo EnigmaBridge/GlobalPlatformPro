@@ -270,7 +270,8 @@ public class GPToolSocket {
 
                             // If tokenizer is not powerful enough, consider using this one: org.apache.tools.ant.types.Commandline
                             final List<String> inputArgs = GPArgumentTokenizer.tokenize(inputData);
-                            tool.work(inputArgs.toArray(new String[inputArgs.size()]));
+                            final int code = tool.work(inputArgs.toArray(new String[inputArgs.size()]));
+                            printOut.println("Done: " + code);
 
                         } catch (IOException e) {
                             printOut.println("IO: " + e.getMessage());
