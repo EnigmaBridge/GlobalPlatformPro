@@ -115,10 +115,8 @@ public final class GPTool {
 	private final static String OPT_VIRGIN = "virgin";
 	private final static String OPT_VISA2 = "visa2";
 
-
-	private static OptionSet parseArguments(String[] argv) throws IOException {
-		OptionSet args = null;
-		OptionParser parser = new OptionParser();
+	private static OptionParser setupParser(){
+		final OptionParser parser = new OptionParser();
 
 		// Generic options
 		parser.acceptsAll(Arrays.asList("V", OPT_VERSION), "Show information about the program");
@@ -195,6 +193,12 @@ public final class GPTool {
 		parser.accepts(OPT_OP201, "Enable OpenPlatform 2.0.1 mode");
 
 		parser.accepts(OPT_SDAID, "ISD AID").withRequiredArg().withValuesConvertedBy(ArgMatchers.aid());
+		return parser;
+	}
+
+	private static OptionSet parseArguments(String[] argv) throws IOException {
+		OptionSet args = null;
+		final OptionParser parser = setupParser();
 
 		// Parse arguments
 		try {
