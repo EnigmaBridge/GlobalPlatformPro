@@ -275,9 +275,12 @@ public class GPToolSocket {
 
                         } catch (IOException e) {
                             printOut.println("IO: " + e.getMessage());
+                            e.printStackTrace(System.err);
 
                         } catch (NoSuchAlgorithmException e) {
                             printOut.println("Exception: " + e.getMessage());
+                            e.printStackTrace(System.err);
+                            
                         }
                     }
                 });
