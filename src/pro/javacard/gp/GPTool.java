@@ -123,7 +123,7 @@ public final class GPTool {
 		this.err = err;
 	}
 
-	protected static OptionParser setupParser(){
+	public static OptionParser setupParser(){
 		final OptionParser parser = new OptionParser();
 
 		// Generic options
@@ -204,11 +204,11 @@ public final class GPTool {
 		return parser;
 	}
 
-	protected static OptionSet parseArguments(String[] argv) throws IOException {
+	public static OptionSet parseArguments(String[] argv) throws IOException {
 		return parseArguments(argv, System.out, System.err);
 	}
 
-	protected static OptionSet parseArguments(String[] argv, PrintStream out, PrintStream err) throws IOException {
+	public static OptionSet parseArguments(String[] argv, PrintStream out, PrintStream err) throws IOException {
 		OptionSet args = null;
 		final OptionParser parser = setupParser();
 
@@ -237,9 +237,12 @@ public final class GPTool {
 		return args;
 	}
 
-	protected int work(String[] argv) throws IOException, NoSuchAlgorithmException {
+	public int work(String[] argv) throws IOException, NoSuchAlgorithmException {
 		final OptionSet args = parseArguments(argv, out, err);
+		return work(args);
+	}
 
+	public int work(OptionSet args) throws IOException, NoSuchAlgorithmException {
 		if (args.has(OPT_VERBOSE)) {
 			// Set up slf4j simple in a way that pleases us
 			System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", "debug");
@@ -834,14 +837,14 @@ public final class GPTool {
 		return 0;
 	}
 
-	private void fail(String msg) {
-		err.println(msg);
-	}
-
 	public static void main(String[] argv) throws Exception {
 		final GPTool tool = new GPTool();
 		final int returnCode = tool.work(argv);
 		System.exit(returnCode);
+	}
+
+	protected void fail(String msg) {
+		err.println(msg);
 	}
 
 	// FIXME: get rid
