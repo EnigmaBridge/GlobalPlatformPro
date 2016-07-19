@@ -251,10 +251,15 @@ public class GPToolSocket {
                     @Override
                     public void run() {
                         // Terminate handler
-                        if (allowTerminate != null && inputData.startsWith(TERMINATE_MAGIC_STRING)){
-                            printOut.println("Server is shutting down");
-                            parent.shutdownServer();
-                            return;
+                        if (inputData.startsWith(TERMINATE_MAGIC_STRING)){
+                            if (allowTerminate != null && allowTerminate) {
+                                printOut.println("Server is shutting down");
+                                parent.shutdownServer();
+                                return;
+                            } else {
+                                printOut.println("Server termination is disabled");
+                                return;
+                            }
                         }
 
                         final GPTool tool = new GPTool(printOut, printOut);
