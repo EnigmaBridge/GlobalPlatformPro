@@ -29,6 +29,7 @@ ant
  * SCP03 support in [latest version](https://github.com/martinpaljak/GlobalPlatformPro/releases)
  * Tentative [milestones](https://github.com/martinpaljak/GlobalPlatformPro/milestones)
  * [JavaCard Buyer's Guide of 2016](https://github.com/martinpaljak/GlobalPlatformPro/tree/master/docs/JavaCardBuyersGuide)
+ * Connect to gp.jar via TCP
 
 ### Usage
 
@@ -37,6 +38,43 @@ ant
 #### Warning about correct keying
 
 Command line samples assume default test keys of `40..4F`. If you need a custom key, specify it with `-key` (you can give separate keyset components with `-key-mac`, `-key-enc` and `-key-kek`. You need to know the details or ask your card provider. Some cards require key diversification with `-emv` or `-visa2` (ask your vendor if unsure). A Key Check Value can be given with `-kcv` option.
+
+#### Using via TCP
+
+It is possible to run gp.jar as a TCP server and instead of creating a new Java instance for each new APDU command. The syntax of command-line options remains the same and each command has to be completed with EOF.
+
+ * Starting the server:
+
+        java -classpath gp.jar pro.javacard.gp.GPToolSocket --workers 10 --debug --ip localhost --port 9988 --allow-terminate true
+
+ * Default values:
+   * ip - 127.0.0.1
+   * port - 9988
+   * workers - 1
+   * allow-terminate - false
+
+ * Parameters for starting a server
+   * ip - IP address/interface on which the server will listen
+   * port - TCP port for the server to listen on
+   * workers - how many threads will be started for parallelization (recommended value is the maximum number of smartcards you may use)
+   * debug - client shows commands sent to the server (echo)
+   * verbose - switch logging of errors on (the same is the base gppro)
+   * version - shows the version
+   * allow-terminate - enables stopping the server with a "TERMINATE_PLEASE" command
+
+ * Testing the server
+   * Start the server
+
+         java -classpath gp.jar pro.javacard.gp.GPToolSocket
+         
+   * Use "nc" as a client
+
+         echo -n '--debug --list -v' | nc 127.0.0.1 9988
+
+   * or use telnet
+
+         TBD - not sure how to send EOF
+
 
 #### Generic information
 
