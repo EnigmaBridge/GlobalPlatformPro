@@ -27,6 +27,9 @@ import java.util.concurrent.ThreadPoolExecutor;
  * Tool works with 1 worker thread by default. All jobs are submitted to the worker manager (executor service).
  * To increase parallelism, one can set number of worker threads with --workers.
  *
+ * To send a command to the server you can use
+ * echo '--debug --list' | nc 127.0.0.1 9988
+ *
  * Created by dusanklinec on 19.07.16.
  */
 public class GPToolSocket {
