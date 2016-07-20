@@ -253,7 +253,6 @@ public class GPToolSocket {
 
                     // Enqueue current job to the queue.
                     future = parent.getExecutor().submit(new Runnable() {
-                        @Override
                         public void run() {
                             // Terminate handler
                             if (inputData.startsWith(TERMINATE_MAGIC_STRING)) {
