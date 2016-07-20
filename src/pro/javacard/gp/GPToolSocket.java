@@ -244,12 +244,12 @@ public class GPToolSocket {
 
         public void run() {
             printOut = new PrintStream(output);
+            final Boolean allowTerminate = (Boolean) args.valueOf(OPT_ALLOW_TERMINATE);
             Future<?> future = null;
 
             try {
                 if ((inputData = bufferedInput.readLine()) != null) {
                     //inputData = convertStreamToString(input);
-                    final Boolean allowTerminate = (Boolean) args.valueOf(OPT_ALLOW_TERMINATE);
 
                     // Enqueue current job to the queue.
                     future = parent.getExecutor().submit(new Runnable() {
