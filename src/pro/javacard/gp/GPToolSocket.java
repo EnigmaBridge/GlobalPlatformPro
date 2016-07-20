@@ -146,13 +146,13 @@ public class GPToolSocket {
         }
 
         // Workers spawn
-        final int workers = (int) args.valueOf(OPT_WORKERS);
+        final int workers = (Integer) args.valueOf(OPT_WORKERS);
         executor = (ThreadPoolExecutor) Executors.newFixedThreadPool(workers);
 
         // Start the server.
         try {
             final String ip = (String) args.valueOf(OPT_IP);
-            final int port = (int) args.valueOf(OPT_PORT);
+            final int port = (Integer) args.valueOf(OPT_PORT);
 
             final ServerSocket listenSocket = (ip.equals(DEFAULT_IP)) ?
                     new ServerSocket(port) :

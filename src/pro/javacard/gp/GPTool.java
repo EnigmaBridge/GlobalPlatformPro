@@ -431,7 +431,7 @@ public final class GPTool {
 					// See https://github.com/martinpaljak/GlobalPlatformPro/issues/32
 					// The name of the option comes from a common abbreviation as well as dd utility
 					if (args.has(OPT_BS)) {
-						gp.setBlockSize((int)args.valueOf(OPT_BS));
+						gp.setBlockSize((Integer) args.valueOf(OPT_BS));
 					}
 					if (args.has(OPT_INFO) || args.has(OPT_VERBOSE)) {
 						out.println("Reader: " + reader.getName());
@@ -471,7 +471,7 @@ public final class GPTool {
 						// Override SCP version
 						int scp_version = 0;
 						if (args.has(OPT_SCP)) {
-							scp_version = (int) args.valueOf(OPT_SCP);
+							scp_version = (Integer) args.valueOf(OPT_SCP);
 						}
 
 						// Possibly brick the card now, if keys don't match.
@@ -781,7 +781,7 @@ public final class GPTool {
 							int new_version = 1;
 
 							if (args.has(OPT_NEW_KEY_VERSION)) {
-								new_version = (int) args.valueOf(OPT_NEW_KEY_VERSION);
+								new_version = (Integer) args.valueOf(OPT_NEW_KEY_VERSION);
 							}
 							// Add into a list
 							List<GPKeySet.GPKey> updatekeys = new ArrayList<GPKeySet.GPKey>();
