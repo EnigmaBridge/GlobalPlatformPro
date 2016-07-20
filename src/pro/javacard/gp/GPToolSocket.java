@@ -20,16 +20,16 @@ import java.util.concurrent.ThreadPoolExecutor;
  * Socket version of GPTool.
  * Opens listening socket at the specified address & port (default 127.0.0.1:9988)
  * listening for commands.
- *
+ * <p>
  * Each connection corresponds to one GPTool execution. String passed to the port
  * is passed to GPTool as input arguments. Response is written to the connection and closed.
- *
+ * <p>
  * Tool works with 1 worker thread by default. All jobs are submitted to the worker manager (executor service).
  * To increase parallelism, one can set number of worker threads with --workers.
- *
+ * <p>
  * To send a command to the server you can use
  * echo '--debug --list' | nc 127.0.0.1 9988
- *
+ * <p>
  * Created by dusanklinec on 19.07.16.
  */
 public class GPToolSocket {
@@ -150,7 +150,7 @@ public class GPToolSocket {
         executor = (ThreadPoolExecutor) Executors.newFixedThreadPool(workers);
 
         // Start the server.
-        try{
+        try {
             final String ip = (String) args.valueOf(OPT_IP);
             final int port = (int) args.valueOf(OPT_PORT);
 
@@ -162,7 +162,7 @@ public class GPToolSocket {
             System.out.println(String.format("Server is listening on %s:%d", ip, port));
 
             // Listening loop.
-            while(running) {
+            while (running) {
                 try {
                     final Socket clientSocket = listenSocket.accept();
                     if (args.has(OPT_DEBUG)) {
@@ -171,20 +171,19 @@ public class GPToolSocket {
 
                     final Connection c = new Connection(this, clientSocket);
 
-                } catch(SocketTimeoutException timeout){
+                } catch (SocketTimeoutException timeout) {
                     // Timeout is OK.
                 }
             }
 
             System.out.println("Server shutting down");
-        }
-        catch(IOException e) {
+        } catch (IOException e) {
             System.out.println("Listen :" + e.getMessage());
         }
 
         // Shutdown executor service, wait for task completion.
         executor.shutdown();
-        while (!executor.isTerminated()){
+        while (!executor.isTerminated()) {
             Thread.sleep(500);
         }
 
@@ -205,7 +204,7 @@ public class GPToolSocket {
         return executor;
     }
 
-    public void shutdownServer(){
+    public void shutdownServer() {
         this.running = false;
     }
 
@@ -219,6 +218,7 @@ public class GPToolSocket {
      */
     static class Connection extends Thread {
         protected InputStream input;
+        protected BufferedReader bufferedInput;
         protected OutputStream output;
         protected Socket clientSocket;
         protected OptionSet args;
@@ -227,17 +227,18 @@ public class GPToolSocket {
         protected PrintStream printOut;
         protected String inputData;
 
-        public Connection (GPToolSocket parent, Socket aClientSocket) {
+        public Connection(GPToolSocket parent, Socket aClientSocket) {
             try {
                 clientSocket = aClientSocket;
                 input = clientSocket.getInputStream();
+                bufferedInput = new BufferedReader(
+                        new InputStreamReader(input));
                 output = clientSocket.getOutputStream();
                 this.args = parent.getArgs();
                 this.parent = parent;
                 this.start();
-            }
-            catch(IOException e) {
-                System.out.println("Connection: "+e.getMessage());
+            } catch (IOException e) {
+                System.out.println("Connection: " + e.getMessage());
             }
         }
 
@@ -246,50 +247,52 @@ public class GPToolSocket {
             Future<?> future = null;
 
             try {
-                inputData = convertStreamToString(input);
-                final Boolean allowTerminate = (Boolean) args.valueOf(OPT_ALLOW_TERMINATE);
+                if ((inputData = bufferedInput.readLine()) != null) {
+                    //inputData = convertStreamToString(input);
+                    final Boolean allowTerminate = (Boolean) args.valueOf(OPT_ALLOW_TERMINATE);
 
-                // Enqueue current job to the queue.
-                future = parent.getExecutor().submit(new Runnable() {
-                    @Override
-                    public void run() {
-                        // Terminate handler
-                        if (inputData.startsWith(TERMINATE_MAGIC_STRING)){
-                            if (allowTerminate != null && allowTerminate) {
-                                printOut.println("Server is shutting down");
-                                parent.shutdownServer();
-                                return;
-                            } else {
-                                printOut.println("Server termination is disabled");
-                                return;
-                            }
-                        }
-
-                        final GPTool tool = new GPTool(printOut, printOut);
-                        try {
-                            if (args.has(OPT_DEBUG)){
-                                printOut.println(String.format("Input: <<<%s>>>", inputData));
+                    // Enqueue current job to the queue.
+                    future = parent.getExecutor().submit(new Runnable() {
+                        @Override
+                        public void run() {
+                            // Terminate handler
+                            if (inputData.startsWith(TERMINATE_MAGIC_STRING)) {
+                                if (allowTerminate != null && allowTerminate) {
+                                    printOut.println("Server is shutting down");
+                                    parent.shutdownServer();
+                                    return;
+                                } else {
+                                    printOut.println("Server termination is disabled");
+                                    return;
+                                }
                             }
 
-                            // If tokenizer is not powerful enough, consider using this one: org.apache.tools.ant.types.Commandline
-                            final List<String> inputArgs = GPArgumentTokenizer.tokenize(inputData);
-                            final int code = tool.work(inputArgs.toArray(new String[inputArgs.size()]));
-                            printOut.println("Done: " + code);
+                            final GPTool tool = new GPTool(printOut, printOut);
+                            try {
+                                if (args.has(OPT_DEBUG)) {
+                                    printOut.println(String.format("Input: <<<%s>>>", inputData));
+                                }
 
-                        } catch (IOException e) {
-                            printOut.println("IO: " + e.getMessage());
-                            e.printStackTrace(System.err);
+                                // If tokenizer is not powerful enough, consider using this one: org.apache.tools.ant.types.Commandline
+                                final List<String> inputArgs = GPArgumentTokenizer.tokenize(inputData);
+                                final int code = tool.work(inputArgs.toArray(new String[inputArgs.size()]));
+                                printOut.println("Done: " + code);
 
-                        } catch (NoSuchAlgorithmException e) {
-                            printOut.println("Exception: " + e.getMessage());
-                            e.printStackTrace(System.err);
-                            
+                            } catch (IOException e) {
+                                printOut.println("IO: " + e.getMessage());
+                                e.printStackTrace(System.err);
+
+                            } catch (NoSuchAlgorithmException e) {
+                                printOut.println("Exception: " + e.getMessage());
+                                e.printStackTrace(System.err);
+
+                            }
                         }
-                    }
-                });
+                    });
 
-                // Wait to finish the computation
-                final Object o = future.get();
+                    // Wait to finish the computation
+                    final Object o = future.get();
+                }
 
             } catch (Exception e) {
                 printOut.println("Exception: " + e.getMessage());
@@ -301,7 +304,7 @@ public class GPToolSocket {
                     /*close failed*/
                 }
 
-                if (future != null && !future.isDone() && !future.isCancelled()){
+                if (future != null && !future.isDone() && !future.isCancelled()) {
                     future.cancel(true);
                 }
             }
