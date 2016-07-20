@@ -73,7 +73,8 @@ It is possible to run gp.jar as a TCP server and instead of creating a new Java 
 
    * or use telnet
 
-         TBD - not sure how to send EOF
+         telnet 127.0.0.1 9988
+         > --debug --list -v <enter>
 
 
 #### Generic information
